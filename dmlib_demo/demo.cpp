@@ -14,6 +14,7 @@
 #include <windows.h>
 
 #include <commctrl.h>
+#include <commdlg.h>
 #include <richedit.h>
 
 #include <algorithm>
@@ -1375,14 +1376,23 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, [[maybe_unused]] 
 			dmlib::setDarkWndNotifySafe(hDlg);
 			std::wstring dmlVer = L"Darkmodelib demo ";
 #if defined(DMLIB_DLL)
-			dmlVer += L"DLL";
+			dmlVer += L"DLL ";
 #endif
-			dmlVer += L" v";
+			dmlVer += L"v";
 			dmlVer += std::to_wstring(dmlib::getLibInfo(static_cast<int>(dmlib::LibInfo::verMajor)));
 			dmlVer += L'.';
 			dmlVer += std::to_wstring(dmlib::getLibInfo(static_cast<int>(dmlib::LibInfo::verMinor)));
 			dmlVer += L'.';
 			dmlVer += std::to_wstring(dmlib::getLibInfo(static_cast<int>(dmlib::LibInfo::verRevision)));
+			dmlVer += L" ";
+
+#if defined(_MSC_VER)
+			dmlVer += L"MSVC";
+#elif defined(__clang__)
+			dmlVer += L"Clang";
+#elif defined(__GNUC__)
+			dmlVer += L"GCC";
+#endif
 
 			SetDlgItemTextW(hDlg, IDC_ABOUT_VERSION, dmlVer.c_str());
 			return TRUE;

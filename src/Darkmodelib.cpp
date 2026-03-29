@@ -182,6 +182,12 @@ struct DarkModeParams
 /// Threshold range around 50.0 where TreeView uses classic style instead of light/dark.
 static constexpr double kMiddleGrayRange = 2.0;
 
+#if defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wexit-time-destructors"
+#pragma clang diagnostic ignored "-Wglobal-constructors"
+#endif
+
 namespace // anonymous
 {
 	/// Global struct
@@ -247,6 +253,10 @@ static dmlib_color::ThemeView& getThemeView() noexcept
 	static dmlib_color::ThemeView tView{};
 	return tView;
 }
+
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#endif
 
 COLORREF dmlib::setBackgroundColor(COLORREF clrNew)         { return getTheme().setColorBackground(clrNew); }
 COLORREF dmlib::setCtrlBackgroundColor(COLORREF clrNew)     { return getTheme().setColorCtrlBackground(clrNew); }
