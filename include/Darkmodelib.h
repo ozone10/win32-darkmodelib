@@ -537,7 +537,7 @@ namespace dmlib
 	/// Applies "DarkMode_Explorer" visual style to scroll bars.
 	DMLIB_API void setDarkScrollBar(HWND hWnd);
 	/// Applies "DarkMode_Explorer" visual style to tooltip controls based on context.
-	DMLIB_API void setDarkTooltips(HWND hWnd, int tooltipType);
+	DMLIB_API void setDarkTooltips(HWND hWnd, UINT tooltipType);
 	/// Applies "DarkMode_DarkTheme" visual style if supported and experimental mode is active.
 	DMLIB_API void setDarkThemeTheme(HWND hWnd);
 

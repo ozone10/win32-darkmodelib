@@ -1498,59 +1498,59 @@ void dmlib::removeComboBoxCtrlSubclass(HWND hWnd)
  * @see DarkModeParams
  * @see dmlib::setComboBoxCtrlSubclass()
  */
-static void setComboBoxCtrlSubclassAndTheme(HWND hWnd, DarkModeParams p) noexcept
+static void setComboBoxCtrlSubclassAndTheme(HWND hWnd, DarkModeParams p)
 {
 	const auto cbStyle = ::GetWindowLongPtr(hWnd, GWL_STYLE) & CBS_DROPDOWNLIST;
 	const bool isCbList = cbStyle == CBS_DROPDOWNLIST;
 	const bool isCbSimple = cbStyle == CBS_SIMPLE;
 
-	if (isCbList
-		|| cbStyle == CBS_DROPDOWN
-		|| isCbSimple)
+	if (cbStyle == 0) // something wrong happened
 	{
-		COMBOBOXINFO cbi{};
-		cbi.cbSize = sizeof(COMBOBOXINFO);
-		if (::GetComboBoxInfo(hWnd, &cbi) == TRUE
-			&& p.m_theme
-			&& cbi.hwndList != nullptr)
-		{
-			if (isCbSimple)
-			{
-				dmlib::replaceClientEdgeWithBorderSafe(cbi.hwndList);
-			}
+		return;
+	}
 
-			// dark scroll bar for list box of combo box
-			::SetWindowTheme(cbi.hwndList, p.m_themeClassName, nullptr);
+	COMBOBOXINFO cbi{};
+	cbi.cbSize = sizeof(COMBOBOXINFO);
+	if (::GetComboBoxInfo(hWnd, &cbi) == TRUE
+		&& p.m_theme
+		&& cbi.hwndList != nullptr)
+	{
+		if (isCbSimple)
+		{
+			dmlib::replaceClientEdgeWithBorderSafe(cbi.hwndList);
 		}
 
-		if (!dmlib_subclass::isThemePrefered() && p.m_subclass)
+		// dark scroll bar for list box of combo box
+		::SetWindowTheme(cbi.hwndList, p.m_themeClassName, nullptr);
+	}
+
+	if (!dmlib_subclass::isThemePrefered() && p.m_subclass)
+	{
+		if (HWND hParent = ::GetParent(hWnd);
+			hParent == nullptr
+			|| dmlib_subclass::getWndClassName(hParent) != WC_COMBOBOXEX)
 		{
-			if (HWND hParent = ::GetParent(hWnd);
-				hParent == nullptr
-				|| dmlib_subclass::getWndClassName(hParent) != WC_COMBOBOXEX)
-			{
-				dmlib::setComboBoxCtrlSubclass(hWnd);
-			}
+			dmlib::setComboBoxCtrlSubclass(hWnd);
+		}
+	}
+
+	if (p.m_theme) // for light dropdown arrow in dark mode
+	{
+		if (HWND hParent = ::GetParent(hWnd);
+			doesWin11SupportDarkThemeStyle()
+			&& (hParent == nullptr
+				|| dmlib_subclass::getWndClassName(hParent) != WC_COMBOBOXEX))
+		{
+			dmlib::setDarkThemeTheme(hWnd);
+		}
+		else
+		{
+			dmlib::setDarkThemeExperimentalEx(hWnd, L"CFD");
 		}
 
-		if (p.m_theme) // for light dropdown arrow in dark mode
+		if (!isCbList)
 		{
-			if (HWND hParent = ::GetParent(hWnd);
-				doesWin11SupportDarkThemeStyle()
-				&& (hParent == nullptr
-					|| dmlib_subclass::getWndClassName(hParent) != WC_COMBOBOXEX))
-			{
-				dmlib::setDarkThemeTheme(hWnd);
-			}
-			else
-			{
-				dmlib::setDarkThemeExperimentalEx(hWnd, L"CFD");
-			}
-
-			if (!isCbList)
-			{
-				::SendMessage(hWnd, CB_SETEDITSEL, 0, 0); // clear selection
-			}
+			::SendMessage(hWnd, CB_SETEDITSEL, 0, 0); // clear selection
 		}
 	}
 }
@@ -2079,7 +2079,7 @@ static void setDTPCtrlSubclassAndTheme(HWND hWnd, DarkModeParams p) noexcept
  * @see dmlib::setTreeViewWindowTheme()
  * @see dmlib::setDarkTooltips()
  */
-static void setTreeViewCtrlTheme(HWND hWnd, DarkModeParams p) noexcept
+static void setTreeViewCtrlTheme(HWND hWnd, DarkModeParams p)
 {
 	if (p.m_theme)
 	{
@@ -2265,7 +2265,7 @@ static void setMonthCalendarCtrlTheme(HWND hWnd, DarkModeParams p) noexcept
  * @see setDTPCtrlSubclassAndTheme()
  * @see setMonthCalendarCtrlTheme()
  */
-static BOOL CALLBACK DarkEnumChildProc(HWND hWnd, LPARAM lParam) noexcept
+static BOOL CALLBACK DarkEnumChildProc(HWND hWnd, LPARAM lParam)
 {
 	const auto& p = *reinterpret_cast<DarkModeParams*>(lParam);
 	const std::wstring className = dmlib_subclass::getWndClassName(hWnd);
@@ -2857,8 +2857,13 @@ void dmlib::setDarkScrollBar(HWND hWnd)
  * @see dmlib::setDarkExplorerTheme()
  * @see ToolTipsType
  */
-void dmlib::setDarkTooltips(HWND hWnd, int tooltipType)
+void dmlib::setDarkTooltips(HWND hWnd, UINT tooltipType)
 {
+	if (tooltipType > static_cast<UINT>(dmlib::ToolTipsType::rebar))
+	{
+		return;
+	}
+
 	const auto type = static_cast<ToolTipsType>(tooltipType);
 	UINT msg = 0;
 	switch (type)
@@ -2990,7 +2995,7 @@ void dmlib::setDarkListView(HWND hWnd)
  *
  * @note Does nothing on pre-Windows 11 systems.
  */
-static void setDarkCheckboxes(HWND hWnd, HIMAGELIST hImgList, ViewCheckbox viewCheckbox)
+static void setDarkCheckboxes(HWND hWnd, HIMAGELIST hImgList, ViewCheckbox viewCheckbox) noexcept
 {
 	if (!dmlib::isAtLeastWindows11())
 	{
@@ -3030,7 +3035,7 @@ static void setDarkCheckboxes(HWND hWnd, HIMAGELIST hImgList, ViewCheckbox viewC
 
 	HICON hIcon = ::CreateIconIndirect(&ii);
 
-	auto addIcon = [&hImgList, &idx, &hIcon]()
+	auto addIcon = [&hImgList, &idx, &hIcon]() noexcept
 	{
 		if (hIcon != nullptr)
 		{
@@ -3043,7 +3048,7 @@ static void setDarkCheckboxes(HWND hWnd, HIMAGELIST hImgList, ViewCheckbox viewC
 
 	addIcon(); // unchecked state
 
-	auto addIconState = [&](int iStateId)
+	auto addIconState = [&](int iStateId) noexcept
 	{
 		::DrawThemeBackground(hTheme, hBoxDC, BP_CHECKBOX, iStateId, &rcBox, nullptr);
 		ii.hbmColor = hBoxBmp;
@@ -3131,6 +3136,11 @@ void dmlib::setDarkListViewCheckboxes(HWND hWnd)
  */
 void dmlib::setDarkTreeViewCheckboxes(HWND hWnd)
 {
+	if (hWnd == nullptr)
+	{
+		return;
+	}
+
 	ViewCheckbox tvType = ViewCheckbox::tvSimple;
 	if (const auto tvStyle = ::GetWindowLongPtr(hWnd, GWL_STYLE);
 		(tvStyle & TVS_CHECKBOXES) == TVS_CHECKBOXES)
@@ -4089,10 +4099,14 @@ static HRESULT CALLBACK DarkTaskDlgMsgBoxCallback(
 	{
 		dmlib::setDarkTaskDlg(hWnd);
 		if ((uType & (MB_SYSTEMMODAL | MB_TOPMOST)) != 0)
+		{
 			::SetWindowPos(hWnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+		}
 
 		if ((uType & MB_SETFOREGROUND) == MB_SETFOREGROUND)
+		{
 			::SetForegroundWindow(hWnd);
+		}
 	}
 	return S_OK;
 }
@@ -4170,14 +4184,11 @@ static TASKDIALOGCONFIG msgBoxParamToTaskDlgConfig(HWND hWnd, LPCWSTR lpText, LP
 		{
 			return btnIDs.at(1);
 		}
-		else if (btnDefMask == MB_DEFBUTTON3)
+		if (btnDefMask == MB_DEFBUTTON3)
 		{
 			return btnIDs.at(2);
 		}
-		else
-		{
-			return btnIDs.at(0);
-		}
+		return btnIDs.at(0);
 	};
 
 	switch (uType & MB_TYPEMASK)
@@ -4289,7 +4300,9 @@ static TASKDIALOGCONFIG msgBoxParamToTaskDlgConfig(HWND hWnd, LPCWSTR lpText, LP
 	// other
 
 	if ((uType & MB_RTLREADING) == MB_RTLREADING)
+	{
 		tdc.dwFlags |= TDF_RTL_LAYOUT;
+	}
 
 	return tdc;
 }

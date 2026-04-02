@@ -65,7 +65,7 @@ static void renderButton(
 	HTHEME hTheme,
 	int iPartID,
 	int iStateID
-) noexcept
+)
 {
 	// Font part
 
@@ -198,7 +198,7 @@ static void renderButton(
  *
  * @see renderButton()
  */
-static void paintButton(HWND hWnd, HDC hdc, dmlib_subclass::ButtonData& buttonData) noexcept
+static void paintButton(HWND hWnd, HDC hdc, dmlib_subclass::ButtonData& buttonData)
 {
 	const auto& hTheme = buttonData.m_themeData.getHTheme();
 
@@ -360,7 +360,7 @@ LRESULT CALLBACK dmlib_subclass::ButtonSubclass(
 	LPARAM lParam,
 	UINT_PTR uIdSubclass,
 	DWORD_PTR dwRefData
-) noexcept
+)
 {
 	auto* pButtonData = reinterpret_cast<ButtonData*>(dwRefData);
 	auto& themeData = pButtonData->m_themeData;
@@ -492,7 +492,7 @@ LRESULT CALLBACK dmlib_subclass::ButtonSubclass(
  *
  * @see dmlib::paintRoundFrameRect()
  */
-static void paintGroupbox(HWND hWnd, HDC hdc, const dmlib_subclass::ButtonData& buttonData) noexcept
+static void paintGroupbox(HWND hWnd, HDC hdc, const dmlib_subclass::ButtonData& buttonData)
 {
 	const auto& hTheme = buttonData.m_themeData.getHTheme();
 
@@ -614,7 +614,7 @@ LRESULT CALLBACK dmlib_subclass::GroupboxSubclass(
 	LPARAM lParam,
 	UINT_PTR uIdSubclass,
 	DWORD_PTR dwRefData
-) noexcept
+)
 {
 	auto* pButtonData = reinterpret_cast<ButtonData*>(dwRefData);
 	auto& themeData = pButtonData->m_themeData;
@@ -1178,7 +1178,7 @@ static void paintTabItem(
 	int iSelTab,
 	int nTabs,
 	const POINT& ptCursor
-) noexcept
+)
 {
 	RECT rcFrame{ rcItem };
 
@@ -1189,11 +1189,11 @@ static void paintTabItem(
 	::InflateRect(&rcItem, -1, -1);
 	rcItem.right += 1;
 
-	auto label = std::wstring(MAX_PATH, L'\0');
-	TCITEM tci{};
+	auto buffer = std::wstring(MAX_PATH, L'\0'); // label
+	TCITEMW tci{};
 	tci.mask = TCIF_TEXT | TCIF_IMAGE | TCIF_STATE;
 	tci.dwStateMask = TCIS_HIGHLIGHTED;
-	tci.pszText = label.data();
+	tci.pszText = buffer.data();
 	tci.cchTextMax = MAX_PATH - 1;
 
 	TabCtrl_GetItem(hWnd, i, &tci);
@@ -1202,9 +1202,18 @@ static void paintTabItem(
 	const auto nStyle = ::GetWindowLongPtr(hWnd, GWL_STYLE);
 	if ((nStyle & TCS_BUTTONS) == TCS_BUTTONS) // is button
 	{
-		const bool isHighlighted = (tci.dwState & TCIS_HIGHLIGHTED) == TCIS_HIGHLIGHTED;
-		::FillRect(hdc, &rcItem, isHighlighted ? dmlib::getHotBackgroundBrush() : dmlib::getDlgBackgroundBrush());
-		::SetTextColor(hdc, isHighlighted ? dmlib::getLinkTextColor() : dmlib::getDarkerTextColor());
+		if (const bool isHighlighted = (tci.dwState & TCIS_HIGHLIGHTED) == TCIS_HIGHLIGHTED;
+			isHighlighted)
+		{
+			::FillRect(hdc, &rcItem, dmlib::getHotBackgroundBrush());
+			::SetTextColor(hdc, dmlib::getLinkTextColor());
+		}
+		else
+		{
+			::FillRect(hdc, &rcItem, dmlib::getDlgBackgroundBrush());
+			::SetTextColor(hdc, dmlib::getDarkerTextColor());
+		}
+		
 		::FrameRect(hdc, &rcFrame, dmlib::getEdgeBrush());
 	}
 	else
@@ -1218,6 +1227,10 @@ static void paintTabItem(
 			::OffsetRect(&rcText, 0, -1);
 			rcFrame.bottom += 1;
 			rcFrame.left -= 2;
+		}
+		else if ((i - 1) == iSelTab)
+		{
+			rcFrame.top += paddingTop;
 		}
 		else
 		{
@@ -1233,6 +1246,8 @@ static void paintTabItem(
 		}
 	}
 
+	dmlib_paint::paintRect(hdc, rcFrame, dmlib::getEdgePen(), getBrushFromState(isSelectedTab, isHot));
+
 	// Draw image
 	if (tci.iImage != -1)
 	{
@@ -1245,30 +1260,29 @@ static void paintTabItem(
 		rcText.left += cx;
 	}
 
-	dmlib_paint::paintRect(hdc, rcFrame, dmlib::getEdgePen(), getBrushFromState(isSelectedTab, isHot));
-
 	if (dmlib::isAtLeastWindows11() && isSelectedTab)
 	{
-		const RECT rcHighliteLine{ rcFrame.left, rcFrame.top, rcFrame.right, rcFrame.top + paddingTop };
+		const RECT rcHighliteLine{ rcFrame.left + 1, rcFrame.top + 1, rcFrame.right - 1, rcFrame.top + paddingTop + 1 };
 		dmlib_paint::paintRect(hdc, rcHighliteLine, dmlib::getHighlightEdgePen(), dmlib::getHighlightEdgeBrush());
 	}
 
-	::DrawText(hdc, label.c_str(), -1, &rcText, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+	::DrawText(hdc, buffer.c_str(), -1, &rcText, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
 	// Draw focus keyboard cue
-	if (isSelectedTab && ::GetFocus() == hWnd)
+	if (!isSelectedTab || ::GetFocus() != hWnd)
 	{
-		if (const auto uiState = static_cast<DWORD>(::SendMessage(hWnd, WM_QUERYUISTATE, 0, 0));
-			(uiState & UISF_HIDEFOCUS) != UISF_HIDEFOCUS)
+		return;
+	}
+
+	if (const auto uiState = static_cast<DWORD>(::SendMessage(hWnd, WM_QUERYUISTATE, 0, 0));
+		(uiState & UISF_HIDEFOCUS) != UISF_HIDEFOCUS)
+	{
+		if (dmlib::isAtLeastWindows11())
 		{
-			if (dmlib::isAtLeastWindows11())
-			{
-				rcFrame.top += paddingTop;
-				rcFrame.bottom -= 1;
-			}
-			::InflateRect(&rcFrame, -2, -1);
-			::DrawFocusRect(hdc, &rcFrame);
+			rcFrame.top += (paddingTop + 1);
 		}
+		::InflateRect(&rcFrame, -2, -1);
+		::DrawFocusRect(hdc, &rcFrame);
 	}
 }
 
@@ -1292,7 +1306,7 @@ static void paintTabItem(
  * @param[in]   hdc     Device context to draw into.
  * @param[in]   rect    Tab control rectangle.
  */
-static void paintTab(HWND hWnd, HDC hdc, const RECT& rect) noexcept
+static void paintTab(HWND hWnd, HDC hdc, const RECT& rect)
 {
 	::FillRect(hdc, &rect, dmlib::getDlgBackgroundBrush());
 
@@ -1313,7 +1327,7 @@ static void paintTab(HWND hWnd, HDC hdc, const RECT& rect) noexcept
 	::ExcludeClipRect(hdc, rcSelTab.left, rcSelTab.top, rcSelTab.right, rcSelTab.bottom);
 
 	static const int roundness = dmlib::isAtLeastWindows11() ? dmlib_paint::kWin11CornerRoundness : 0;
-	RECT rcCont{ rect.left, rcSelTab.bottom - 1, rect.right, rect.bottom };
+	const RECT rcCont{ rect.left, rcSelTab.bottom - 1, rect.right, rect.bottom };
 	dmlib_paint::paintRoundFrameRect(hdc, rcCont, dmlib::getEdgePen(), roundness, roundness);
 
 	const auto hPen = dmlib_paint::GdiObject{ hdc, dmlib::getEdgePen(), true };
@@ -1343,7 +1357,7 @@ static void paintTab(HWND hWnd, HDC hdc, const RECT& rect) noexcept
 			continue; // Skip to the next iteration when there is no intersection
 		}
 
-		RECT rcTmp{ rcItem.left - 2, rcItem.top, rcItem.right, rcItem.bottom };
+		const RECT rcTmp{ rcItem.left - 2, rcItem.top, rcItem.right + 1, rcItem.bottom };
 		HRGN hClip = ::CreateRectRgnIndirect(&rcTmp);
 		::SelectClipRgn(hdc, hClip);
 
@@ -1383,7 +1397,7 @@ LRESULT CALLBACK dmlib_subclass::TabPaintSubclass(
 	LPARAM lParam,
 	UINT_PTR uIdSubclass,
 	DWORD_PTR dwRefData
-) noexcept
+)
 {
 	auto* pTabData = reinterpret_cast<TabData*>(dwRefData);
 	const auto& hMemDC = pTabData->m_bufferData.getHMemDC();
@@ -1438,7 +1452,7 @@ LRESULT CALLBACK dmlib_subclass::TabPaintSubclass(
 			RECT rcClient{};
 			::GetClientRect(hWnd, &rcClient);
 			dmlib_paint::PaintWithBuffer<TabData>(*pTabData, hdc, ps,
-				[&]() noexcept { paintTab(hWnd, hMemDC, rcClient); },
+				[&]() { paintTab(hWnd, hMemDC, rcClient); },
 				hWnd);
 
 			::EndPaint(hWnd, &ps);
@@ -1484,7 +1498,7 @@ LRESULT CALLBACK dmlib_subclass::TabUpDownSubclass(
 	LPARAM lParam,
 	UINT_PTR uIdSubclass,
 	[[maybe_unused]] DWORD_PTR dwRefData
-) noexcept
+)
 {
 	switch (uMsg)
 	{
@@ -1726,7 +1740,7 @@ static int getComboBoxStateAndRect(HWND hWnd, RECT& rcClient) noexcept
 	{
 		return  CBXSR_DISABLED;
 	}
-	else if (::PtInRect(&rcClient, ptCursor) != FALSE)
+	if (::PtInRect(&rcClient, ptCursor) != FALSE)
 	{
 		return CBXSR_HOT;
 	}
@@ -1882,7 +1896,12 @@ static void renderComboBoxEdit(HWND hWnd, HDC hdc, dmlib_subclass::ComboBoxData&
  * @see paintComboBox()
  * @see renderComboBoxEdit()
  */
-static void renderComboBoxList(HWND hWnd, HDC hdc, dmlib_subclass::ComboBoxData& comboBoxData, int iStateID) noexcept
+static void renderComboBoxList(
+	HWND hWnd,
+	HDC hdc,
+	dmlib_subclass::ComboBoxData& comboBoxData,
+	int iStateID
+)
 {
 	auto& themeData = comboBoxData.m_themeData;
 	const auto& hTheme = themeData.getHTheme();
@@ -1915,7 +1934,7 @@ static void renderComboBoxList(HWND hWnd, HDC hdc, dmlib_subclass::ComboBoxData&
 		index != CB_ERR)
 	{
 		const auto bufferLen = static_cast<size_t>(::SendMessage(hWnd, CB_GETLBTEXTLEN, static_cast<WPARAM>(index), 0));
-		std::wstring buffer(bufferLen + 1, L'\0');
+		auto buffer = std::wstring(bufferLen + 1, L'\0');
 		::SendMessage(hWnd, CB_GETLBTEXT, static_cast<WPARAM>(index), reinterpret_cast<LPARAM>(buffer.data()));
 
 		RECT rcText{ cbi.rcItem };
@@ -1985,7 +2004,7 @@ static void renderComboBoxList(HWND hWnd, HDC hdc, dmlib_subclass::ComboBoxData&
  * @see renderComboBoxEdit()
  * @see renderComboBoxList()
  */
-static void renderComboBox(HWND hWnd, HDC hdc, dmlib_subclass::ComboBoxData& comboBoxData, int iStateID) noexcept
+static void renderComboBox(HWND hWnd, HDC hdc, dmlib_subclass::ComboBoxData& comboBoxData, int iStateID)
 {
 	if (comboBoxData.m_cbStyle == CBS_DROPDOWNLIST)
 	{
@@ -2015,7 +2034,7 @@ static void renderComboBox(HWND hWnd, HDC hdc, dmlib_subclass::ComboBoxData& com
  * @see renderComboBoxEdit()
  * @see renderComboBoxList()
  */
-static void paintComboBox(HWND hWnd, HDC hdc, dmlib_subclass::ComboBoxData& comboBoxData) noexcept
+static void paintComboBox(HWND hWnd, HDC hdc, dmlib_subclass::ComboBoxData& comboBoxData)
 {
 	RECT rcClient{};
 	const int iStateID = getComboBoxStateAndRect(hWnd, rcClient);
@@ -2096,7 +2115,7 @@ LRESULT CALLBACK dmlib_subclass::ComboBoxSubclass(
 	LPARAM lParam,
 	UINT_PTR uIdSubclass,
 	DWORD_PTR dwRefData
-) noexcept
+)
 {
 	auto* pComboboxData = reinterpret_cast<ComboBoxData*>(dwRefData);
 	auto& themeData = pComboboxData->m_themeData;
@@ -2148,7 +2167,7 @@ LRESULT CALLBACK dmlib_subclass::ComboBoxSubclass(
 				}
 
 				dmlib_paint::PaintWithBuffer<ComboBoxData>(*pComboboxData, hdc, ps,
-					[&]() noexcept { paintComboBox(hWnd, hMemDC, *pComboboxData); },
+					[&]() { paintComboBox(hWnd, hMemDC, *pComboboxData); },
 					hWnd);
 			}
 			else
@@ -2470,7 +2489,7 @@ static void paintHeaderItem(
 	RECT& rcItem,
 	bool hasGridlines,
 	const DTTOPTS& dtto
-) noexcept
+)
 {
 	const HTHEME& hTheme = headerData.m_themeData.getHTheme();
 
@@ -2493,7 +2512,7 @@ static void paintHeaderItem(
 		::FillRect(hdc, &rcTmp, dmlib::getHeaderHotBackgroundBrush());
 	}
 
-	std::wstring buffer(MAX_PATH, L'\0');
+	auto buffer = std::wstring(MAX_PATH, L'\0');
 	HDITEM hdi{};
 	hdi.mask = HDI_TEXT | HDI_FORMAT;
 	hdi.pszText = buffer.data();
@@ -2583,7 +2602,7 @@ static void paintHeaderItem(
  * @see HeaderData
  * @see paintHeaderItem()
  */
-static void paintHeader(HWND hWnd, HDC hdc, dmlib_subclass::HeaderData& headerData) noexcept
+static void paintHeader(HWND hWnd, HDC hdc, dmlib_subclass::HeaderData& headerData)
 {
 	auto& themeData = headerData.m_themeData;
 	const auto& hTheme = themeData.getHTheme();
@@ -2680,7 +2699,7 @@ LRESULT CALLBACK dmlib_subclass::HeaderSubclass(
 	LPARAM lParam,
 	UINT_PTR uIdSubclass,
 	DWORD_PTR dwRefData
-) noexcept
+)
 {
 	auto* pHeaderData = reinterpret_cast<HeaderData*>(dwRefData);
 	auto& themeData = pHeaderData->m_themeData;
@@ -2727,7 +2746,7 @@ LRESULT CALLBACK dmlib_subclass::HeaderSubclass(
 			}
 
 			dmlib_paint::PaintWithBuffer<HeaderData>(*pHeaderData, hdc, ps,
-				[&]() noexcept { paintHeader(hWnd, hMemDC, *pHeaderData); },
+				[&]() { paintHeader(hWnd, hMemDC, *pHeaderData); },
 				hWnd);
 
 			::EndPaint(hWnd, &ps);
@@ -2834,7 +2853,7 @@ LRESULT CALLBACK dmlib_subclass::HeaderSubclass(
  *
  * @see StatusBarData
  */
-static void paintStatusBar(HWND hWnd, HDC hdc, dmlib_subclass::StatusBarData& statusBarData) noexcept
+static void paintStatusBar(HWND hWnd, HDC hdc, dmlib_subclass::StatusBarData& statusBarData)
 {
 	struct
 	{
@@ -2963,7 +2982,7 @@ LRESULT CALLBACK dmlib_subclass::StatusBarSubclass(
 	LPARAM lParam,
 	UINT_PTR uIdSubclass,
 	DWORD_PTR dwRefData
-) noexcept
+)
 {
 	auto* pStatusBarData = reinterpret_cast<StatusBarData*>(dwRefData);
 	auto& themeData = pStatusBarData->m_themeData;
@@ -3010,7 +3029,7 @@ LRESULT CALLBACK dmlib_subclass::StatusBarSubclass(
 			}
 
 			dmlib_paint::PaintWithBuffer<StatusBarData>(*pStatusBarData, hdc, ps,
-				[&]() noexcept { paintStatusBar(hWnd, hMemDC, *pStatusBarData); },
+				[&]() { paintStatusBar(hWnd, hMemDC, *pStatusBarData); },
 				hWnd);
 
 			::EndPaint(hWnd, &ps);

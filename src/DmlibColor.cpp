@@ -26,7 +26,7 @@
 namespace dmlib_win32api
 {
 	[[nodiscard]] bool IsDarkModeActive() noexcept;
-}
+} // namespace dmlib_win32api
 
 dmlib::Colors dmlib_color::getLightColors() noexcept
 {
@@ -117,12 +117,10 @@ static COLORREF adjustClrLightness(COLORREF clr, bool useDark) noexcept
 		l += luminanceAdjustment;
 		return useDark ? ::ColorHLSToRGB(h, l, s) : clr;
 	}
-	else
-	{
-		s += saturationAdjustment;
-		l -= luminanceAdjustment;
-		return useDark ? clr : ::ColorHLSToRGB(h, l, s);
-	}
+
+	s += saturationAdjustment;
+	l -= luminanceAdjustment;
+	return useDark ? clr : ::ColorHLSToRGB(h, l, s);
 }
 
 COLORREF dmlib_color::getAccentColor(bool adjust) noexcept

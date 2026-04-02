@@ -96,7 +96,7 @@ LRESULT CALLBACK dmlib_subclass::WindowEraseBgSubclass(
  * @param[in]   lParam      Message-specific data to get child HWND.
  * @return The brush handle as LRESULT for background painting.
  */
-static LRESULT onCtlColorStaticHelper(LPARAM lParam, WPARAM wParam) noexcept
+static LRESULT onCtlColorStaticHelper(LPARAM lParam, WPARAM wParam)
 {
 	auto* hdc = reinterpret_cast<HDC>(wParam);
 	auto hChild = reinterpret_cast<HWND>(lParam);
@@ -158,7 +158,7 @@ LRESULT CALLBACK dmlib_subclass::WindowCtlColorSubclass(
 	LPARAM lParam,
 	UINT_PTR uIdSubclass,
 	[[maybe_unused]] DWORD_PTR dwRefData
-) noexcept
+)
 {
 	switch (uMsg)
 	{
@@ -577,7 +577,7 @@ static void prepaintListViewItem(LPNMLVCUSTOMDRAW& lplvcd, bool isReport, bool h
 				return nullptr;
 			}();
 
-			if (hBrush)
+			if (hBrush != nullptr)
 			{
 				::FillRect(lplvcd->nmcd.hdc, &lplvcd->nmcd.rc, hBrush);
 			}
@@ -956,7 +956,12 @@ static void postpaintTreeViewItem(const LPNMTVCUSTOMDRAW& lptvcd) noexcept
  *
  * @see dmlib_subclass::WindowNotifySubclass()
  */
-static LRESULT onNotifyCustomDrawOrDTPDropDown(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) noexcept
+static LRESULT onNotifyCustomDrawOrDTPDropDown(
+	HWND hWnd,
+	UINT uMsg,
+	WPARAM wParam,
+	LPARAM lParam
+)
 {
 	auto* lpnmhdr = reinterpret_cast<LPNMHDR>(lParam);
 	if (lpnmhdr->code == NM_CUSTOMDRAW)
@@ -1040,7 +1045,7 @@ LRESULT CALLBACK dmlib_subclass::WindowNotifySubclass(
 	LPARAM lParam,
 	UINT_PTR uIdSubclass,
 	[[maybe_unused]] DWORD_PTR dwRefData
-) noexcept
+)
 {
 	switch (uMsg)
 	{
@@ -1112,10 +1117,10 @@ static void paintMenuBar(HWND hWnd, HDC hdc) noexcept
  *
  * @see dmlib_subclass::WindowMenuBarSubclass()
  */
-static void paintMenuBarItems(UAHDRAWMENUITEM& UDMI, const HTHEME& hTheme) noexcept
+static void paintMenuBarItems(UAHDRAWMENUITEM& UDMI, const HTHEME& hTheme)
 {
 	// get the menu item string
-	std::wstring buffer(MAX_PATH, L'\0');
+	auto buffer = std::wstring(MAX_PATH, L'\0');
 	MENUITEMINFO mii{};
 	mii.cbSize = sizeof(MENUITEMINFO);
 	mii.fMask = MIIM_STRING;
@@ -1284,7 +1289,7 @@ LRESULT CALLBACK dmlib_subclass::WindowMenuBarSubclass(
 	LPARAM lParam,
 	UINT_PTR uIdSubclass,
 	DWORD_PTR dwRefData
-) noexcept
+)
 {
 	auto* pMenuThemeData = reinterpret_cast<ThemeData*>(dwRefData);
 
@@ -1298,7 +1303,7 @@ LRESULT CALLBACK dmlib_subclass::WindowMenuBarSubclass(
 		case WM_NCDESTROY:
 		{
 			::RemoveWindowSubclass(hWnd, WindowMenuBarSubclass, uIdSubclass);
-			std::unique_ptr<ThemeData> ptrData(pMenuThemeData);
+			const std::unique_ptr<ThemeData> ptrData(pMenuThemeData);
 			break;
 		}
 
@@ -1501,7 +1506,7 @@ static LRESULT CALLBACK DarkTaskDlgSubclass(
 	LPARAM lParam,
 	UINT_PTR uIdSubclass,
 	DWORD_PTR dwRefData
-) noexcept
+)
 {
 	auto* pTaskDlgData = reinterpret_cast<TaskDlgData*>(dwRefData);
 
@@ -1510,7 +1515,7 @@ static LRESULT CALLBACK DarkTaskDlgSubclass(
 		case WM_NCDESTROY:
 		{
 			::RemoveWindowSubclass(hWnd, DarkTaskDlgSubclass, uIdSubclass);
-			std::unique_ptr<TaskDlgData> ptrData(pTaskDlgData);
+			const std::unique_ptr<TaskDlgData> ptrData(pTaskDlgData);
 			break;
 		}
 
