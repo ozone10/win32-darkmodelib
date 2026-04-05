@@ -1325,9 +1325,10 @@ static void paintTab(HWND hWnd, HDC hdc, const RECT& rect)
 	TabCtrl_GetItemRect(hWnd, iTab, &rcSelTab);
 
 	::ExcludeClipRect(hdc, rcSelTab.left, rcSelTab.top, rcSelTab.right, rcSelTab.bottom);
+	rcSelTab.bottom -= 1;
 
 	static const int roundness = dmlib::isAtLeastWindows11() ? dmlib_paint::kWin11CornerRoundness : 0;
-	const RECT rcCont{ rect.left, rcSelTab.bottom - 1, rect.right, rect.bottom };
+	const RECT rcCont{ rect.left, rcSelTab.bottom, rect.right, rect.bottom };
 	dmlib_paint::paintRoundFrameRect(hdc, rcCont, dmlib::getEdgePen(), roundness, roundness);
 
 	const auto hPen = dmlib_paint::GdiObject{ hdc, dmlib::getEdgePen(), true };
@@ -1877,6 +1878,7 @@ static void renderComboBoxEdit(HWND hWnd, HDC hdc, dmlib_subclass::ComboBoxData&
  * - Hot (hover) state
  * - Focus state
  * - Dark mode theme availability
+ * - `CBS_OWNERDRAWFIXED` and `CBS_OWNERDRAWVARIABLE` flags
  *
  * Paint logic:
  * - Draws background with different brushes for normal, hot, and disabled states
@@ -1924,6 +1926,7 @@ static void renderComboBoxList(
 	const bool isHot = iStateID == CBXSR_HOT;
 
 	const HBRUSH hBrush = getBrushFromState(isDisabled, isHot);
+	const COLORREF clrText = isDisabled ? dmlib::getDisabledTextColor() : dmlib::getTextColor();
 
 	// Text part
 
@@ -1933,28 +1936,52 @@ static void renderComboBoxList(
 	if (const auto index = static_cast<int>(::SendMessage(hWnd, CB_GETCURSEL, 0, 0));
 		index != CB_ERR)
 	{
-		const auto bufferLen = static_cast<size_t>(::SendMessage(hWnd, CB_GETLBTEXTLEN, static_cast<WPARAM>(index), 0));
-		auto buffer = std::wstring(bufferLen + 1, L'\0');
-		::SendMessage(hWnd, CB_GETLBTEXT, static_cast<WPARAM>(index), reinterpret_cast<LPARAM>(buffer.data()));
-
-		RECT rcText{ cbi.rcItem };
-		::InflateRect(&rcText, -2, 0);
-
-		static constexpr DWORD dtFlags = DT_NOPREFIX | DT_LEFT | DT_VCENTER | DT_SINGLELINE;
-		if (hasTheme)
+		if (const bool isOwnerDraw = (::GetWindowLongPtr(hWnd, GWL_STYLE) & (CBS_OWNERDRAWFIXED | CBS_OWNERDRAWVARIABLE)) != 0;
+			isOwnerDraw)
 		{
-			DTTOPTS dtto{};
-			dtto.dwSize = sizeof(DTTOPTS);
-			dtto.dwFlags = DTT_TEXTCOLOR;
-			dtto.crText = isDisabled ? dmlib::getDisabledTextColor() : dmlib::getTextColor();
+			const auto itemData = ::SendMessage(hWnd, CB_GETITEMDATA, static_cast<WPARAM>(index), 0);
+			const UINT id = ::GetDlgCtrlID(hWnd);
 
-			::DrawThemeTextEx(hTheme, hdc, CP_DROPDOWNITEM, iStateID, buffer.c_str(), -1, dtFlags, &rcText, &dtto);
+			const DRAWITEMSTRUCT dis{
+				ODT_COMBOBOX
+				, id
+				, static_cast<UINT>(index)
+				, ODA_DRAWENTIRE
+				, ODS_DEFAULT
+				, hWnd
+				, hdc
+				, cbi.rcItem
+				, static_cast<ULONG_PTR>(itemData)
+			};
+
+			::SetTextColor(hdc, clrText);
+			::SendMessage(::GetParent(hWnd), WM_DRAWITEM, id, reinterpret_cast<LPARAM>(&dis));
 		}
 		else
 		{
-			::SetTextColor(hdc, isDisabled ? dmlib::getDisabledTextColor() : dmlib::getTextColor());
-			::SetBkMode(hdc, TRANSPARENT);
-			::DrawText(hdc, buffer.c_str(), -1, &rcText, dtFlags);
+			const auto bufferLen = static_cast<size_t>(::SendMessage(hWnd, CB_GETLBTEXTLEN, static_cast<WPARAM>(index), 0));
+			auto buffer = std::wstring(bufferLen + 1, L'\0');
+			::SendMessage(hWnd, CB_GETLBTEXT, static_cast<WPARAM>(index), reinterpret_cast<LPARAM>(buffer.data()));
+
+			RECT rcText{ cbi.rcItem };
+			::InflateRect(&rcText, -2, 0);
+
+			static constexpr DWORD dtFlags = DT_NOPREFIX | DT_LEFT | DT_VCENTER | DT_SINGLELINE;
+			if (hasTheme)
+			{
+				DTTOPTS dtto{};
+				dtto.dwSize = sizeof(DTTOPTS);
+				dtto.dwFlags = DTT_TEXTCOLOR;
+				dtto.crText = clrText;
+
+				::DrawThemeTextEx(hTheme, hdc, CP_DROPDOWNITEM, iStateID, buffer.c_str(), -1, dtFlags, &rcText, &dtto);
+			}
+			else
+			{
+				::SetTextColor(hdc, clrText);
+				::SetBkMode(hdc, TRANSPARENT);
+				::DrawText(hdc, buffer.c_str(), -1, &rcText, dtFlags);
+			}
 		}
 	}
 
