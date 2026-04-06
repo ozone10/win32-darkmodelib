@@ -137,6 +137,8 @@ namespace dmlib_subclass
 		bool m_isHorizontal = false;
 		bool m_wasHotNext = false;
 
+		static constexpr LONG kOffset = 2;
+
 		UpDownData() = delete;
 
 		explicit UpDownData(HWND hWnd)
@@ -169,15 +171,13 @@ namespace dmlib_subclass
 			}
 			else
 			{
-				static constexpr LONG offset = 2;
-
 				const RECT rcArrowTop{
-					m_rcClient.left + offset, m_rcClient.top,
+					m_rcClient.left + kOffset, m_rcClient.top,
 					m_rcClient.right, m_rcClient.bottom - ((m_rcClient.bottom - m_rcClient.top) / 2)
 				};
 
 				const RECT rcArrowBottom{
-					m_rcClient.left + offset, rcArrowTop.bottom,
+					m_rcClient.left + kOffset, rcArrowTop.bottom,
 					m_rcClient.right, m_rcClient.bottom
 				};
 

@@ -435,7 +435,10 @@ LRESULT CALLBACK dmlib_subclass::ButtonSubclass(
 		case WM_SIZE:
 		case WM_DESTROY:
 		{
-			::BufferedPaintStopAllAnimations(hWnd);
+			if (dmlib_paint::isAnimationEnabled())
+			{
+				::BufferedPaintStopAllAnimations(hWnd);
+			}
 			break;
 		}
 
@@ -780,10 +783,11 @@ static HPEN getEdgePenFromState(bool isDisabled, bool isHot) noexcept
 };
 
 /**
- * @brief Get up-down control state and client rectangle.
+ * @brief Get up-down control state.
  *
- * @param[in]       hWnd        Handle to the up-down control.
- * @param[in,out]   rcClient    Rectangle for up-down button.
+ * @param[in]   hWnd        Handle to the up-down control.
+ * @param[in]   ptCursor    Position of mouse cursor.
+ * @param[in]   rcBtn       Rectangle for up-down button.
  *
  * @see UpDownData
  * @see paintUpDown()
@@ -814,6 +818,7 @@ static int getUpDownBtnState(HWND hWnd, const POINT& ptCursor, const RECT& rcBtn
  * @param[in]   rect        Rectangle that defines the area in which to paint the button.
  * @param[in]   isDisabled  Boolean indicating if the button is in a disabled state.
  * @param[in]   isHot       Boolean indicating if the button is in a hot state.
+ * @param[in]   roundness   Corner radius of rectangle.
  */
 static void paintUpDownBtn(
 	HDC hdc,
@@ -941,7 +946,7 @@ static void paintArrow(
  * - Rounded corners (optional, based on Windows 11 and parent class)
  * - Direction-aware layout and glyph placement
  *
- * @param[in]       hWnd            Handle to the combo box control.
+ * @param[in]       hWnd            Handle to the up-down control.
  * @param[in]       hdc             Device context to draw into.
  * @param[in,out]   upDownData      Reference to layout and state information (segments, orientation, corner radius).
  * @param[in]       iStateIDPrev    State of the up-down previous button.
@@ -1098,9 +1103,15 @@ static void paintUpDown(
 
 	animParams.dwDuration /= 2;
 
+	RECT rcTmp{ upDownData.m_rcClient };
+	if (!upDownData.m_isHorizontal)
+	{
+		rcTmp.left += upDownData.kOffset;
+	}
+
 	HDC hdcFrom = nullptr;
 	HDC hdcTo = nullptr;
-	if (HANIMATIONBUFFER hbpAnimation = ::BeginBufferedAnimation(hWnd, hdc, &upDownData.m_rcClient, BPBF_COMPATIBLEBITMAP, nullptr, &animParams, &hdcFrom, &hdcTo);
+	if (HANIMATIONBUFFER hbpAnimation = ::BeginBufferedAnimation(hWnd, hdc, &rcTmp, BPBF_COMPATIBLEBITMAP, nullptr, &animParams, &hdcFrom, &hdcTo);
 		hbpAnimation != nullptr)
 	{
 		if (hdcFrom != nullptr)
@@ -1202,8 +1213,8 @@ LRESULT CALLBACK dmlib_subclass::UpDownSubclass(
 
 				if (!pUpDownData->m_isHorizontal)
 				{
-					::OffsetRect(&ps.rcPaint, 2, 0);
-					::OffsetRect(&rcClient, 2, 0);
+					::OffsetRect(&ps.rcPaint, pUpDownData->kOffset, 0);
+					::OffsetRect(&rcClient, pUpDownData->kOffset, 0);
 				}
 
 				dmlib_paint::PaintWithBuffer<UpDownData>(*pUpDownData, hdc, ps,
@@ -1229,6 +1240,16 @@ LRESULT CALLBACK dmlib_subclass::UpDownSubclass(
 		case WM_THEMECHANGED:
 		{
 			themeData.closeTheme();
+			break;
+		}
+
+		case WM_SIZE:
+		case WM_DESTROY:
+		{
+			if (dmlib_paint::isAnimationEnabled())
+			{
+				::BufferedPaintStopAllAnimations(hWnd);
+			}
 			break;
 		}
 
@@ -2054,11 +2075,11 @@ static void renderComboBoxList(
 			isOwnerDraw)
 		{
 			const auto itemData = ::SendMessage(hWnd, CB_GETITEMDATA, static_cast<WPARAM>(index), 0);
-			const UINT id = ::GetDlgCtrlID(hWnd);
+			const int id = ::GetDlgCtrlID(hWnd);
 
 			const DRAWITEMSTRUCT dis{
 				ODT_COMBOBOX
-				, id
+				, static_cast<UINT>(id)
 				, static_cast<UINT>(index)
 				, ODA_DRAWENTIRE
 				, ODS_DEFAULT
@@ -2069,7 +2090,7 @@ static void renderComboBoxList(
 			};
 
 			::SetTextColor(hdc, clrText);
-			::SendMessage(::GetParent(hWnd), WM_DRAWITEM, id, reinterpret_cast<LPARAM>(&dis));
+			::SendMessage(::GetParent(hWnd), WM_DRAWITEM, static_cast<WPARAM>(id), reinterpret_cast<LPARAM>(&dis));
 		}
 		else
 		{
@@ -2329,6 +2350,17 @@ LRESULT CALLBACK dmlib_subclass::ComboBoxSubclass(
 		case WM_THEMECHANGED:
 		{
 			themeData.closeTheme();
+			break;
+		}
+
+		case WM_SIZE:
+		case WM_DESTROY:
+		{
+			if (dmlib_paint::isAnimationEnabled()
+				&& pComboboxData->m_cbStyle != CBS_SIMPLE)
+			{
+				::BufferedPaintStopAllAnimations(hWnd);
+			}
 			break;
 		}
 
