@@ -1551,8 +1551,7 @@ static void setComboBoxCtrlSubclassAndTheme(HWND hWnd, DarkModeParams p) DMLIB_M
 			dmlib::replaceClientEdgeWithBorderSafe(cbi.hwndList);
 		}
 
-		// dark scroll bar for list box of combo box
-		::SetWindowTheme(cbi.hwndList, p.m_themeClassName, nullptr);
+		dmlib::setDarkComboLBox(cbi.hwndList);
 	}
 
 	if (!dmlib_subclass::isThemePrefered() && p.m_subclass)
@@ -2871,6 +2870,35 @@ void dmlib::setDarkExplorerTheme(HWND hWnd)
 void dmlib::setDarkScrollBar(HWND hWnd)
 {
 	dmlib::setDarkExplorerTheme(hWnd);
+}
+
+/**
+ * @brief Themes a combo box drop-down list (ComboLBox).
+ *
+ * `DarkMode_Explorer` on ComboLBox makes items ignore `WM_CTLCOLORLISTBOX`
+ * (white text on a dark popup, or a white popup). An empty app name keeps
+ * items off visual styles so control-color messages apply. `pszSubIdList`
+ * `DarkMode_Explorer::ScrollBar` is the same part-class RichEdit uses; if
+ * that does not take, ComboLBoxSubclass paints a dark non-client scrollbar.
+ *
+ * @param[in] hList Handle to the combo list (`COMBOBOXINFO::hwndList`).
+ *
+ * @see dmlib_subclass::ComboLBoxSubclass()
+ */
+void dmlib::setDarkComboLBox(HWND hList)
+{
+	if (hList == nullptr)
+	{
+		return;
+	}
+	dmlib_win32api::AllowDarkModeForWindow(hList, dmlib::isExperimentalActive());
+	::SetWindowTheme(hList, L"", L"");
+	if (dmlib::isEnabled() && dmlib::isExperimentalActive())
+	{
+		::SetWindowTheme(hList, nullptr, L"DarkMode_Explorer::ScrollBar");
+	}
+	dmlib_subclass::SetSubclass(hList, dmlib_subclass::ComboLBoxSubclass, dmlib_subclass::SubclassID::comboLBox);
+	::RedrawWindow(hList, nullptr, nullptr, RDW_FRAME | RDW_INVALIDATE | RDW_ERASE);
 }
 
 /**

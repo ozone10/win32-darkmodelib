@@ -143,6 +143,7 @@ EXPORTS
 	setDarkThemeExperimental
 	setDarkExplorerTheme
 	setDarkScrollBar
+	setDarkComboLBox
 	setDarkTooltips
 	setDarkLineAbovePanelToolbar
 	setDarkListView
