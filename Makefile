@@ -32,6 +32,7 @@ ifeq ($(CXX),clang++)
 						-Wno-c++98-compat \
 						-Wno-c++98-compat-pedantic \
 						-Wno-c99-extensions \
+						-Wno-lifetime-safety-intra-tu-suggestions \
 						-Wno-padded \
 						-Wno-switch-default
 else
